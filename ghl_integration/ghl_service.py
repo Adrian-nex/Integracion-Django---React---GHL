@@ -17,11 +17,17 @@ class GHLService:
     def __init__(self):
         self.base_url = settings.GHL_BASE_URL
         self.private_token = settings.GHL_PRIVATE_TOKEN
+        self.default_location_id = getattr(settings, 'GHL_DEFAULT_LOCATION_ID', None)
+        self.mock = getattr(settings, 'GHL_MOCK', False)
         self.headers = {
-            'Authorization': f'Bearer {self.private_token}',
+            'Authorization': f'Bearer {self.private_token}' if self.private_token else '',
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            'Version': '2021-07-28',  # Header de versión requerido por GHL
         }
+        # Algunos entornos requieren LocationId como header además del query param
+        if self.default_location_id:
+            self.headers['LocationId'] = self.default_location_id
     
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict:
         """
@@ -36,9 +42,16 @@ class GHLService:
             Dict: Respuesta de la API
         """
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
+
+        # Si está activado el modo mock, devolvemos datos simulados según el endpoint
+        if self.mock:
+            return self._mock_response(method, endpoint, data)
         
         try:
             logger.info(f"Haciendo petición {method} a {url}")
+            logger.info(f"Headers: {self.headers}")
+            if data:
+                logger.info(f"Datos: {data}")
             
             response = requests.request(
                 method=method,
@@ -49,6 +62,7 @@ class GHLService:
             )
             
             logger.info(f"Respuesta recibida: Status {response.status_code}")
+            logger.info(f"Respuesta headers: {dict(response.headers)}")
             
             # Si la respuesta es exitosa, retornamos el JSON
             if response.status_code in [200, 201]:
@@ -79,31 +93,91 @@ class GHLService:
                 'status_code': 500
             }
     
+    def _mock_response(self, method: str, endpoint: str, data: Optional[Dict]) -> Dict:
+        """Respuestas simuladas para desarrollo sin depender de GHL real"""
+        endpoint = endpoint.split('?')[0].rstrip('/')  # normalizar
+        
+        # Mock de /locations/search
+        if method == 'GET' and endpoint.endswith('/locations/search'):
+            locations = [{
+                'id': self.default_location_id or 'loc_mock_001',
+                'name': 'Clínica Demo',
+                'status': 'active'
+            }]
+            return {'success': True, 'data': {'locations': locations}, 'status_code': 200}
+        
+        # Mock de /calendars
+        if method == 'GET' and endpoint.endswith('/calendars'):
+            calendars = [
+                {'id': 'cal_mock_001', 'name': 'Calendario General', 'status': 'active'},
+                {'id': 'cal_mock_002', 'name': 'Odontología', 'status': 'active'},
+            ]
+            return {'success': True, 'data': {'calendars': calendars}, 'status_code': 200}
+        
+        # Mock crear cita
+        if method == 'POST' and endpoint.endswith('/calendars/events/appointments'):
+            appointment = {
+                'id': 'apt_mock_001',
+                'calendarId': data.get('calendarId') if data else 'cal_mock_001',
+                'contactId': data.get('contactId') if data else 'contact_mock_001',
+                'startTime': data.get('startTime') if data else '2025-01-01T10:00:00Z',
+                'endTime': data.get('endTime') if data else '2025-01-01T10:30:00Z',
+                'status': data.get('appointmentStatus', 'confirmed') if data else 'confirmed',
+                'title': data.get('title', 'Cita de prueba (mock)') if data else 'Cita de prueba (mock)'
+            }
+            return {'success': True, 'data': appointment, 'status_code': 201}
+        
+        # Mock crear contacto
+        if method == 'POST' and endpoint.endswith('/contacts'):
+            contact = {
+                'id': 'contact_mock_001',
+                'firstName': data.get('firstName', 'Nombre'),
+                'lastName': data.get('lastName', 'Apellido'),
+                'email': data.get('email', 'contacto@demo.com'),
+                'phone': data.get('phone', '+10000000000'),
+            }
+            return {'success': True, 'data': contact, 'status_code': 201}
+        
+        return {'success': False, 'error': {'message': 'Mock no definido para este endpoint'}, 'status_code': 404}
+    
     def test_connection(self) -> Dict:
         """
-        Ejercicio 3: Prueba la conexión con GHL obteniendo las ubicaciones
-        
-        Returns:
-            Dict: Resultado de la prueba de conexión
+        Ejercicio 3: Prueba la conexión con GHL.
+        Estrategia: si /locations/search falla (401), intentamos listar calendarios con un locationId conocido.
         """
-        result = self._make_request('GET', '/locations/search')
-        
-        if result['success']:
-            locations = result['data'].get('locations', [])
+        # Primer intento: listar locations (puede requerir permisos específicos)
+        locations_try = self._make_request('GET', '/locations/search')
+        if locations_try['success']:
+            locations = locations_try['data'].get('locations', [])
             return {
                 'success': True,
                 'message': f'Conexión exitosa! Se encontraron {len(locations)} ubicaciones.',
                 'data': {
                     'total_locations': len(locations),
-                    'locations': locations[:3]  # Solo mostramos las primeras 3 para no saturar
+                    'locations': locations[:3]
                 }
             }
-        else:
-            return {
-                'success': False,
-                'message': 'Error al conectar con GHL API',
-                'error': result['error']
-            }
+        
+        # Segundo intento: usar locationId por defecto (si está configurado)
+        if self.default_location_id:
+            calendars_try = self._make_request('GET', f'/calendars/?locationId={self.default_location_id}')
+            if calendars_try['success']:
+                calendars = calendars_try['data'].get('calendars', [])
+                return {
+                    'success': True,
+                    'message': f'Conexión exitosa usando locationId preconfigurado. {len(calendars)} calendarios disponibles.',
+                    'data': {
+                        'location_id': self.default_location_id,
+                        'total_calendars': len(calendars),
+                        'calendars_sample': calendars[:3]
+                    }
+                }
+        
+        return {
+            'success': False,
+            'message': 'Error al conectar con GHL API',
+            'error': locations_try.get('error', {'message': 'Unknown error'})
+        }
     
     def get_locations(self) -> Dict:
         """
@@ -127,24 +201,21 @@ class GHLService:
         Ejercicio 4: Obtiene los calendarios disponibles
         
         Args:
-            location_id: ID de la ubicación (opcional)
+            location_id: ID de la ubicación. Si no se proporciona, se usa GHL_DEFAULT_LOCATION_ID.
         
         Returns:
             Dict: Lista de calendarios
         """
-        # Si no se proporciona location_id, usar el primer location disponible
-        if not location_id:
-            locations_result = self.get_locations()
-            if locations_result['success'] and locations_result['locations']:
-                location_id = locations_result['locations'][0]['id']
-            else:
-                return {
-                    'success': False,
-                    'error': {'message': 'No se pudo obtener una ubicación válida'}
-                }
+        # Resolver locationId: query param o .env
+        effective_location_id = location_id or self.default_location_id
+        if not effective_location_id:
+            return {
+                'success': False,
+                'error': {'message': 'Se requiere locationId. Proporciónalo en la query o configura GHL_DEFAULT_LOCATION_ID en .env'}
+            }
         
         # Obtener calendarios para la ubicación
-        result = self._make_request('GET', f'/calendars/?locationId={location_id}')
+        result = self._make_request('GET', f'/calendars/?locationId={effective_location_id}')
         
         if result['success']:
             calendars = result['data'].get('calendars', [])
@@ -152,7 +223,7 @@ class GHLService:
                 'success': True,
                 'calendars': calendars,
                 'total_calendars': len(calendars),
-                'location_id': location_id
+                'location_id': effective_location_id
             }
         else:
             return result

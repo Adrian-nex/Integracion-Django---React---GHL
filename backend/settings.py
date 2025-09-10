@@ -154,3 +154,7 @@ CORS_ALLOW_CREDENTIALS = True
 # GoHighLevel API Configuration
 GHL_BASE_URL = os.getenv('GHL_BASE_URL', 'https://services.leadconnectorhq.com')
 GHL_PRIVATE_TOKEN = os.getenv('GHL_PRIVATE_TOKEN')
+# Opcional: locationId por defecto para evitar depender de /locations/search (que puede dar 401)
+GHL_DEFAULT_LOCATION_ID = os.getenv('GHL_DEFAULT_LOCATION_ID')
+# Modo mock: si está en True, el servicio devolverá datos simulados para permitir avanzar sin GHL real
+GHL_MOCK = os.getenv('GHL_MOCK', 'False').lower() in ['true','1','yes']
