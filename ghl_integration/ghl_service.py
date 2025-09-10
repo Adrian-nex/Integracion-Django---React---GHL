@@ -90,11 +90,18 @@ class GHLService:
                 except:
                     error_data = {'message': response.text}
                 
-                return {
+                result_data = {
                     'success': False,
                     'error': error_data,
                     'status_code': response.status_code
                 }
+                
+                # ✨ NUEVO: Incluir info de rate limits incluso en errores (401, 429, etc.)
+                rate_limit_info = self._extract_rate_limit_info(response.headers)
+                if rate_limit_info:
+                    result_data['rate_limit'] = rate_limit_info
+                    
+                return result_data
         
         except requests.exceptions.RequestException as e:
             logger.error(f"Error en petición a GHL API: {str(e)}")
@@ -198,8 +205,9 @@ class GHLService:
         """Extrae información de rate limits de los headers de respuesta"""
         rate_limit_info = {}
         
-        # Headers comunes de rate limiting
+        # Headers comunes de rate limiting + formatos específicos de GHL
         rate_limit_headers = {
+            # Formatos estándar
             'X-RateLimit-Limit': 'limit',
             'X-RateLimit-Remaining': 'remaining', 
             'X-RateLimit-Reset': 'reset',
@@ -209,7 +217,15 @@ class GHLService:
             'X-Rate-Limit-Reset': 'reset',
             'RateLimit-Limit': 'limit',  # Sin X-
             'RateLimit-Remaining': 'remaining',
-            'RateLimit-Reset': 'reset'
+            'RateLimit-Reset': 'reset',
+            
+            # ✨ NUEVO: Formatos específicos de GoHighLevel (minúsculas, sin guiones)
+            'x-ratelimit-max': 'limit',
+            'x-ratelimit-remaining': 'remaining',
+            'x-ratelimit-interval-milliseconds': 'interval_ms',
+            'x-ratelimit-limit-daily': 'daily_limit',
+            'x-ratelimit-daily-remaining': 'daily_remaining',
+            'x-ratelimit-daily-reset': 'daily_reset'
         }
         
         for header_name, key in rate_limit_headers.items():
@@ -221,10 +237,23 @@ class GHLService:
                 except ValueError:
                     rate_limit_info[key] = value
         
+        # Si encontramos headers de GHL, estructurar la info de manera más útil
+        if 'x-ratelimit-remaining' in headers or 'x-ratelimit-max' in headers:
+            # Para GHL, usar la info más relevante como 'remaining' y 'limit' principales
+            if 'remaining' not in rate_limit_info and 'x-ratelimit-remaining' in headers:
+                rate_limit_info['remaining'] = rate_limit_info.get('remaining', int(headers['x-ratelimit-remaining']))
+            if 'limit' not in rate_limit_info and 'x-ratelimit-max' in headers:
+                rate_limit_info['limit'] = rate_limit_info.get('limit', int(headers['x-ratelimit-max']))
+        
         return rate_limit_info if rate_limit_info else None
     
     def _log_rate_limits(self, headers):
         """Loggea información de rate limits en la consola de Django"""
+        # 🔍 DEBUG: Mostrar todos los headers que empiecen con 'x-ratelimit' o similar
+        rate_headers = {k: v for k, v in headers.items() if 'ratelimit' in k.lower() or 'rate-limit' in k.lower()}
+        if rate_headers:
+            logger.info(f"🔍 DEBUG HEADERS: {rate_headers}")
+        
         rate_info = self._extract_rate_limit_info(headers)
         
         if rate_info:
@@ -247,6 +276,17 @@ class GHLService:
             if 'used' in rate_info:
                 msg_parts.append(f"Requests usadas: {rate_info['used']}")
             
+            # ✨ NUEVO: Mostrar información específica de GHL si está disponible
+            if 'daily_remaining' in rate_info:
+                msg_parts.append(f"Cuota diaria restante: {rate_info['daily_remaining']}")
+            
+            if 'daily_limit' in rate_info:
+                msg_parts.append(f"Límite diario: {rate_info['daily_limit']}")
+            
+            if 'interval_ms' in rate_info:
+                interval_seconds = rate_info['interval_ms'] / 1000
+                msg_parts.append(f"Ventana: {interval_seconds}s")
+            
             if 'reset' in rate_info:
                 reset_time = rate_info['reset']
                 try:
@@ -263,8 +303,9 @@ class GHLService:
             logger.info(" | ".join(msg_parts))
             
             # Si quedan muy pocas requests, usar WARNING para mayor visibilidad
-            if rate_info.get('remaining', float('inf')) <= 10:
-                logger.warning(f"🚨 RATE LIMIT CRÍTICO: Solo {rate_info['remaining']} requests restantes!")
+            remaining = rate_info.get('remaining', rate_info.get('daily_remaining', float('inf')))
+            if remaining <= 10:
+                logger.warning(f"🚨 RATE LIMIT CRÍTICO: Solo {remaining} requests restantes!")
         else:
             logger.debug("No se encontraron headers de rate limit en la respuesta")
     
@@ -277,7 +318,7 @@ class GHLService:
         locations_try = self._make_request('GET', '/locations/search')
         if locations_try['success']:
             locations = locations_try['data'].get('locations', [])
-            return {
+            result = {
                 'success': True,
                 'message': f'Conexión exitosa! Se encontraron {len(locations)} ubicaciones.',
                 'data': {
@@ -285,13 +326,17 @@ class GHLService:
                     'locations': locations[:3]
                 }
             }
+            # Incluir rate limits si están disponibles
+            if 'rate_limit' in locations_try:
+                result['rate_limit'] = locations_try['rate_limit']
+            return result
         
         # Segundo intento: usar locationId por defecto (si está configurado)
         if self.default_location_id:
             calendars_try = self._make_request('GET', f'/calendars/?locationId={self.default_location_id}')
             if calendars_try['success']:
                 calendars = calendars_try['data'].get('calendars', [])
-                return {
+                result = {
                     'success': True,
                     'message': f'Conexión exitosa usando locationId preconfigurado. {len(calendars)} calendarios disponibles.',
                     'data': {
@@ -300,6 +345,12 @@ class GHLService:
                         'calendars_sample': calendars[:3]
                     }
                 }
+                # ✨ NUEVO: Intentar preservar rate limits del primer intento o usar del segundo
+                if 'rate_limit' in calendars_try:
+                    result['rate_limit'] = calendars_try['rate_limit']
+                elif 'rate_limit' in locations_try:
+                    result['rate_limit'] = locations_try['rate_limit']
+                return result
         
         return {
             'success': False,
