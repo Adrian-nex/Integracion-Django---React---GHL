@@ -5,6 +5,7 @@ import requests
 from django.conf import settings
 from typing import Dict, List, Optional
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -64,13 +65,23 @@ class GHLService:
             logger.info(f"Respuesta recibida: Status {response.status_code}")
             logger.info(f"Respuesta headers: {dict(response.headers)}")
             
+            # ✨ NUEVO: Capturar y loggear rate limits
+            self._log_rate_limits(response.headers)
+            
             # Si la respuesta es exitosa, retornamos el JSON
             if response.status_code in [200, 201]:
-                return {
+                result_data = {
                     'success': True,
                     'data': response.json(),
                     'status_code': response.status_code
                 }
+                
+                # ✨ Incluir info de rate limits en la respuesta
+                rate_limit_info = self._extract_rate_limit_info(response.headers)
+                if rate_limit_info:
+                    result_data['rate_limit'] = rate_limit_info
+                    
+                return result_data
             else:
                 # Si hay error, retornamos información del error
                 error_data = {}
@@ -97,6 +108,20 @@ class GHLService:
         """Respuestas simuladas para desarrollo sin depender de GHL real"""
         endpoint = endpoint.split('?')[0].rstrip('/')  # normalizar
         
+        # Simular rate limits realistas
+        import random
+        import time
+        mock_rate_limit = {
+            'limit': 1000,
+            'remaining': random.randint(750, 950),  # Simular consumo variable
+            'used': None,  # Se calculará dinámicamente
+            'reset': int(time.time()) + 3600  # Timestamp Unix: 1 hora desde ahora
+        }
+        mock_rate_limit['used'] = mock_rate_limit['limit'] - mock_rate_limit['remaining']
+        
+        # Loggear rate limits simulados
+        logger.info(f"🚦 RATE LIMIT MOCK | Requests restantes: {mock_rate_limit['remaining']} | Límite total: {mock_rate_limit['limit']} | Usadas: {mock_rate_limit['used']} | Se resetea: {datetime.fromtimestamp(mock_rate_limit['reset']).strftime('%H:%M:%S')}")
+        
         # Mock de /locations/search
         if method == 'GET' and endpoint.endswith('/locations/search'):
             locations = [{
@@ -104,7 +129,12 @@ class GHLService:
                 'name': 'Clínica Demo',
                 'status': 'active'
             }]
-            return {'success': True, 'data': {'locations': locations}, 'status_code': 200}
+            return {
+                'success': True, 
+                'data': {'locations': locations}, 
+                'status_code': 200,
+                'rate_limit': mock_rate_limit
+            }
         
         # Mock de /calendars
         if method == 'GET' and endpoint.endswith('/calendars'):
@@ -112,7 +142,12 @@ class GHLService:
                 {'id': 'cal_mock_001', 'name': 'Calendario General', 'status': 'active'},
                 {'id': 'cal_mock_002', 'name': 'Odontología', 'status': 'active'},
             ]
-            return {'success': True, 'data': {'calendars': calendars}, 'status_code': 200}
+            return {
+                'success': True, 
+                'data': {'calendars': calendars}, 
+                'status_code': 200,
+                'rate_limit': mock_rate_limit
+            }
         
         # Mock crear cita
         if method == 'POST' and endpoint.endswith('/calendars/events/appointments'):
@@ -125,7 +160,15 @@ class GHLService:
                 'status': data.get('appointmentStatus', 'confirmed') if data else 'confirmed',
                 'title': data.get('title', 'Cita de prueba (mock)') if data else 'Cita de prueba (mock)'
             }
-            return {'success': True, 'data': appointment, 'status_code': 201}
+            # Simular que crear citas consume más rate limit
+            mock_rate_limit['remaining'] = max(0, mock_rate_limit['remaining'] - 2)
+            mock_rate_limit['used'] = mock_rate_limit['limit'] - mock_rate_limit['remaining']
+            return {
+                'success': True, 
+                'data': appointment, 
+                'status_code': 201,
+                'rate_limit': mock_rate_limit
+            }
         
         # Mock crear contacto
         if method == 'POST' and endpoint.endswith('/contacts'):
@@ -136,9 +179,94 @@ class GHLService:
                 'email': data.get('email', 'contacto@demo.com'),
                 'phone': data.get('phone', '+10000000000'),
             }
-            return {'success': True, 'data': contact, 'status_code': 201}
+            return {
+                'success': True, 
+                'data': contact, 
+                'status_code': 201,
+                'rate_limit': mock_rate_limit
+            }
         
-        return {'success': False, 'error': {'message': 'Mock no definido para este endpoint'}, 'status_code': 404}
+        # Respuesta por defecto con rate limit
+        return {
+            'success': False, 
+            'error': {'message': 'Mock no definido para este endpoint'}, 
+            'status_code': 404,
+            'rate_limit': mock_rate_limit
+        }
+    
+    def _extract_rate_limit_info(self, headers) -> Optional[Dict]:
+        """Extrae información de rate limits de los headers de respuesta"""
+        rate_limit_info = {}
+        
+        # Headers comunes de rate limiting
+        rate_limit_headers = {
+            'X-RateLimit-Limit': 'limit',
+            'X-RateLimit-Remaining': 'remaining', 
+            'X-RateLimit-Reset': 'reset',
+            'X-RateLimit-Used': 'used',
+            'X-Rate-Limit-Limit': 'limit',  # Variante con guiones
+            'X-Rate-Limit-Remaining': 'remaining',
+            'X-Rate-Limit-Reset': 'reset',
+            'RateLimit-Limit': 'limit',  # Sin X-
+            'RateLimit-Remaining': 'remaining',
+            'RateLimit-Reset': 'reset'
+        }
+        
+        for header_name, key in rate_limit_headers.items():
+            if header_name in headers:
+                value = headers[header_name]
+                try:
+                    # Intentar convertir a int si es posible
+                    rate_limit_info[key] = int(value)
+                except ValueError:
+                    rate_limit_info[key] = value
+        
+        return rate_limit_info if rate_limit_info else None
+    
+    def _log_rate_limits(self, headers):
+        """Loggea información de rate limits en la consola de Django"""
+        rate_info = self._extract_rate_limit_info(headers)
+        
+        if rate_info:
+            # Construir mensaje informativo
+            msg_parts = ["🚦 RATE LIMIT INFO"]
+            
+            if 'remaining' in rate_info:
+                remaining = rate_info['remaining']
+                msg_parts.append(f"Requests restantes: {remaining}")
+                
+                # Advertencia si quedan pocas requests
+                if remaining <= 10:
+                    msg_parts.append("⚠️  ADVERTENCIA: Pocas requests restantes!")
+                elif remaining <= 50:
+                    msg_parts.append("⚡ ATENCIÓN: Rate limit aproximándose")
+            
+            if 'limit' in rate_info:
+                msg_parts.append(f"Límite total: {rate_info['limit']}")
+            
+            if 'used' in rate_info:
+                msg_parts.append(f"Requests usadas: {rate_info['used']}")
+            
+            if 'reset' in rate_info:
+                reset_time = rate_info['reset']
+                try:
+                    # Si es timestamp Unix, convertir a fecha legible
+                    if isinstance(reset_time, int) and reset_time > 1000000000:
+                        reset_datetime = datetime.fromtimestamp(reset_time)
+                        msg_parts.append(f"Se resetea: {reset_datetime.strftime('%H:%M:%S')}")
+                    else:
+                        msg_parts.append(f"Se resetea en: {reset_time} segundos")
+                except:
+                    msg_parts.append(f"Reset: {reset_time}")
+            
+            # Log con nivel INFO para que aparezca en consola
+            logger.info(" | ".join(msg_parts))
+            
+            # Si quedan muy pocas requests, usar WARNING para mayor visibilidad
+            if rate_info.get('remaining', float('inf')) <= 10:
+                logger.warning(f"🚨 RATE LIMIT CRÍTICO: Solo {rate_info['remaining']} requests restantes!")
+        else:
+            logger.debug("No se encontraron headers de rate limit en la respuesta")
     
     def test_connection(self) -> Dict:
         """

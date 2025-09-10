@@ -8,6 +8,9 @@ urlpatterns = [
     # Debug endpoint
     path('debug/', views.debug_config, name='debug_config'),
     
+    # ✨ NUEVO: Rate limit monitoring
+    path('rate-limit/', views.rate_limit_status, name='rate_limit_status'),
+    
     # Ejercicio 3: Ping/Test de conexión con GHL
     path('ping/', views.ghl_ping, name='ghl_ping'),
     

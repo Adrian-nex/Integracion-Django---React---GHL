@@ -60,7 +60,42 @@ def debug_config(request):
         'default_location_configured': bool(getattr(settings, 'GHL_DEFAULT_LOCATION_ID', None)),
         'default_location_id': getattr(settings, 'GHL_DEFAULT_LOCATION_ID', None) or 'No configurado',
         'mock_mode': getattr(settings, 'GHL_MOCK', False),
+        'rate_limit_monitoring': 'Activado - Revisa la consola de Django para ver rate limits'
     })
+
+
+@api_view(['GET'])
+def rate_limit_status(request):
+    """
+    ✨ NUEVO: Endpoint para probar rate limits haciendo una petición a GHL
+    y mostrar la información de rate limiting capturada
+    """
+    service = GHLService()
+    
+    # Hacer una petición simple para obtener headers de rate limit
+    result = service.test_connection()
+    
+    response_data = {
+        'success': result.get('success', False),
+        'message': 'Petición realizada para obtener rate limit info',
+        'rate_limit_info': result.get('rate_limit'),
+        'note': 'Revisa la consola de Django para ver los logs detallados de rate limits'
+    }
+    
+    # Si no hay información de rate limit en la respuesta
+    if not result.get('rate_limit'):
+        if service.mock:
+            response_data['rate_limit_info'] = {
+                'limit': 1000,
+                'remaining': 856,
+                'used': 144,
+                'reset': 'En 45 minutos',
+                'note': 'Datos simulados - modo mock activado'
+            }
+        else:
+            response_data['warning'] = 'GHL no devolvió headers de rate limit, o la API no los incluye'
+    
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

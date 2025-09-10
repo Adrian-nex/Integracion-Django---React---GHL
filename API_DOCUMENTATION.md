@@ -29,7 +29,27 @@ GET /api/ghl/debug/
   "ghl_token_prefix": "pit-3ff135...",
   "default_location_configured": true,
   "default_location_id": "r3UrTfNuQviYjKT9vfVz",
-  "mock_mode": false
+  "mock_mode": false,
+  "rate_limit_monitoring": "Activado - Revisa la consola de Django para ver rate limits"
+}
+```
+
+### 1.1. **✨ Rate Limit Monitoring**
+```http
+GET /api/ghl/rate-limit/
+```
+**Respuesta:**
+```json
+{
+  "success": true,
+  "message": "Petición realizada para obtener rate limit info",
+  "rate_limit_info": {
+    "limit": 1000,
+    "remaining": 856,
+    "used": 144,
+    "reset": 1704985200
+  },
+  "note": "Revisa la consola de Django para ver los logs detallados de rate limits"
 }
 ```
 
@@ -46,6 +66,12 @@ GET /api/ghl/ping/?locationId=LOCATION_ID_ESPECIFICO
   "data": {
     "total_locations": 2,
     "locations": [...]
+  },
+  "rate_limit": {
+    "limit": 1000,
+    "remaining": 856,
+    "used": 144,
+    "reset": 1704985200
   }
 }
 ```
@@ -72,7 +98,13 @@ GET /api/ghl/calendars/?locationId=LOCATION_ID_ESPECIFICO
     }
   ],
   "total_calendars": 2,
-  "location_id": "r3UrTfNuQviYjKT9vfVz"
+  "location_id": "r3UrTfNuQviYjKT9vfVz",
+  "rate_limit": {
+    "limit": 1000,
+    "remaining": 854,
+    "used": 146,
+    "reset": 1704985200
+  }
 }
 ```
 
@@ -346,6 +378,45 @@ function CreateAppointment() {
     </form>
   );
 }
+```
+
+---
+
+## 🚦 **Rate Limit Monitoring**
+
+### **Funcionalidades de Rate Limiting**
+
+✨ **Captura Automática**: Todos los endpoints capturan headers `X-RateLimit-*`
+📊 **Logging en Consola**: Información detallada en la consola de Django
+📡 **Incluido en Respuestas**: Rate limit info agregada al JSON de respuesta
+⚠️ **Alertas**: Advertencias cuando quedan pocas requests
+🎭 **Mock Realista**: Simulación de rate limits en modo mock
+
+### **Headers Soportados**
+- `X-RateLimit-Limit` / `X-Rate-Limit-Limit` / `RateLimit-Limit`
+- `X-RateLimit-Remaining` / `X-Rate-Limit-Remaining` / `RateLimit-Remaining`
+- `X-RateLimit-Reset` / `X-Rate-Limit-Reset` / `RateLimit-Reset`
+- `X-RateLimit-Used`
+
+### **Ejemplo de Log en Consola**
+```
+🚦 RATE LIMIT INFO | Requests restantes: 856 | Límite total: 1000 | Usadas: 144 | Se resetea: 14:30:00
+⚡ ATENCIÓN: Rate limit aproximándose
+```
+
+### **Alertas por Nivel**
+- **✅ Normal**: > 50 requests restantes
+- **⚡ Atención**: ≤ 50 requests restantes  
+- **⚠️ Advertencia**: ≤ 10 requests restantes
+- **🚨 Crítico**: ≤ 5 requests restantes
+
+### **Testing de Rate Limits**
+```bash
+# Script de prueba incluido
+python test_rate_limits.py --mock   # Modo mock
+python test_rate_limits.py --real   # API real  
+python test_rate_limits.py --http   # Vía HTTP
+python test_rate_limits.py --all    # Todos los tests
 ```
 
 ---
