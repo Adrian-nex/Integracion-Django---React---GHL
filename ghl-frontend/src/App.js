@@ -19,30 +19,121 @@ import {
 
 // Componentes personalizados
 import TestConnection from './components/TestConnection';
-import CalendarsList from './components/CalendarsList';
+import CalendarsList from './components/CalendarsListImproved';
 import CreateAppointment from './components/CreateAppointment';
 import RateLimitDashboard from './components/RateLimitDashboard';
 import { RateLimitProvider } from './hooks/useRateLimit';
 
-// Tema personalizado para Material-UI
+// Tema moderno y profesional para Material-UI
 const theme = createTheme({
   palette: {
+    mode: 'light',
     primary: {
-      main: '#1976d2',
+      main: '#2563eb', // Azul más vibrante
+      light: '#60a5fa',
+      dark: '#1d4ed8',
+      contrastText: '#ffffff',
     },
     secondary: {
-      main: '#dc004e',
+      main: '#7c3aed', // Morado moderno
+      light: '#a78bfa',
+      dark: '#5b21b6',
+    },
+    success: {
+      main: '#10b981',
+      light: '#34d399',
+      dark: '#047857',
+    },
+    warning: {
+      main: '#f59e0b',
+      light: '#fbbf24',
+      dark: '#d97706',
+    },
+    error: {
+      main: '#ef4444',
+      light: '#f87171',
+      dark: '#dc2626',
     },
     background: {
-      default: '#f5f5f5',
+      default: '#f8fafc', // Gris más suave
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#1f2937',
+      secondary: '#6b7280',
     },
   },
   typography: {
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    h1: {
+      fontWeight: 800,
+      fontSize: '3.5rem',
+      lineHeight: 1.1,
+    },
     h4: {
+      fontWeight: 700,
+      fontSize: '2.125rem',
+      lineHeight: 1.2,
+    },
+    h5: {
       fontWeight: 600,
+      fontSize: '1.5rem',
     },
     h6: {
+      fontWeight: 600,
+      fontSize: '1.25rem',
+    },
+    subtitle1: {
+      fontSize: '1.1rem',
       fontWeight: 500,
+    },
+    body1: {
+      fontSize: '1rem',
+      lineHeight: 1.6,
+    },
+    button: {
+      fontWeight: 600,
+      textTransform: 'none',
+    },
+  },
+  shape: {
+    borderRadius: 12,
+  },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+          border: '1px solid rgba(0, 0, 0, 0.05)',
+          '&:hover': {
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            transform: 'translateY(-1px)',
+            transition: 'all 0.2s ease-in-out',
+          },
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          padding: '8px 16px',
+          fontSize: '0.875rem',
+        },
+        contained: {
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+          '&:hover': {
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          },
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          fontWeight: 500,
+        },
+      },
     },
   },
 });
@@ -68,70 +159,181 @@ function App() {
       <CssBaseline />
       <RateLimitProvider>
         <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
-          {/* App Bar */}
-          <AppBar position="static" elevation={2}>
-            <Toolbar>
-              <Api sx={{ mr: 2 }} />
-              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                Integración Django-React-GoHighLevel
-              </Typography>
+          {/* Header moderno con gradiente */}
+          <AppBar 
+            position="static" 
+            elevation={0}
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderBottom: '1px solid rgba(255,255,255,0.1)'
+            }}
+          >
+            <Toolbar sx={{ py: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mr: 3 }}>
+                <Api sx={{ mr: 1, fontSize: '2rem' }} />
+                <Box>
+                  <Typography variant="h6" component="div" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                    GHL Integration
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.7rem' }}>
+                    Django + React + GoHighLevel
+                  </Typography>
+                </Box>
+              </Box>
               
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ flexGrow: 1 }} />
+              
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <Chip
                   icon={<Code />}
-                  label="Backend 100%"
-                  color="success"
-                  variant="outlined"
+                  label="Backend Ready"
                   size="small"
-                  sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+                  sx={{ 
+                    bgcolor: 'rgba(16, 185, 129, 0.2)',
+                    color: '#10b981',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    fontWeight: 600
+                  }}
                 />
                 <Chip
                   icon={<Speed />}
-                  label="PLUS: Rate Limits"
-                  color="secondary"
-                  variant="outlined"
+                  label="Rate Monitoring"
                   size="small"
-                  sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+                  sx={{ 
+                    bgcolor: 'rgba(124, 58, 237, 0.2)',
+                    color: '#7c3aed',
+                    border: '1px solid rgba(124, 58, 237, 0.3)',
+                    fontWeight: 600
+                  }}
                 />
               </Box>
             </Toolbar>
           </AppBar>
 
           <Container maxWidth="lg" sx={{ py: 4 }}>
-            {/* Encabezado del proyecto */}
-            <Paper elevation={3} sx={{ p: 3, mb: 4, bgcolor: 'primary.50' }}>
-              <Typography variant="h4" gutterBottom sx={{ color: 'primary.main' }}>
-                🏥 Sistema de Gestión de Citas Médicas
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-                Proyecto completo de integración que conecta React con Django y la API de GoHighLevel 
-                para gestionar calendarios y citas médicas. Incluye sistema avanzado de monitoreo de rate limits.
-              </Typography>
-              
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip label="✅ Ejercicio 3: Conexión GHL" color="success" size="small" />
-                <Chip label="✅ Ejercicio 4: Discovery Calendarios" color="success" size="small" />
-                <Chip label="✅ Ejercicio 5: Crear Citas" color="success" size="small" />
-                <Chip label="✨ PLUS: Rate Limit Monitoring" color="secondary" size="small" />
+            {/* Hero Section moderna */}
+            <Box 
+              sx={{ 
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                borderRadius: 3,
+                p: 4,
+                mb: 4,
+                position: 'relative',
+                overflow: 'hidden',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '100px',
+                  height: '100px',
+                  background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(124, 58, 237, 0.2) 100%)',
+                  borderRadius: '50%',
+                  transform: 'translate(30px, -30px)'
+                }
+              }}
+            >
+              <Box sx={{ position: 'relative', zIndex: 1 }}>
+                <Typography 
+                  variant="h4" 
+                  gutterBottom 
+                  sx={{ 
+                    fontWeight: 800,
+                    background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    mb: 2
+                  }}
+                >
+                  🏥 Sistema de Gestión de Citas Médicas
+                </Typography>
+                
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    color: 'text.secondary',
+                    mb: 3,
+                    fontWeight: 400,
+                    maxWidth: '800px',
+                    lineHeight: 1.6
+                  }}
+                >
+                  Plataforma completa que integra <strong>React</strong>, <strong>Django</strong> y la <strong>API de GoHighLevel</strong> 
+                  para gestionar calendarios y citas médicas con monitoreo avanzado de rate limits.
+                </Typography>
+                
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
+                  <Chip 
+                    label="✅ Ejercicio 3: Conexión GHL" 
+                    color="success" 
+                    variant="filled"
+                    sx={{ fontWeight: 600, px: 1 }} 
+                  />
+                  <Chip 
+                    label="✅ Ejercicio 4: Discovery Calendarios" 
+                    color="success" 
+                    variant="filled"
+                    sx={{ fontWeight: 600, px: 1 }} 
+                  />
+                  <Chip 
+                    label="✅ Ejercicio 5: Crear Citas" 
+                    color="success" 
+                    variant="filled"
+                    sx={{ fontWeight: 600, px: 1 }} 
+                  />
+                  <Chip 
+                    label="✨ PLUS: Rate Limit Monitoring" 
+                    color="secondary" 
+                    variant="filled"
+                    sx={{ fontWeight: 600, px: 1 }} 
+                  />
+                </Box>
+                
+                <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ width: 8, height: 8, bgcolor: 'success.main', borderRadius: '50%' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      Backend Django Ready
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      React Frontend Active
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ width: 8, height: 8, bgcolor: 'warning.main', borderRadius: '50%' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      GoHighLevel Connected
+                    </Typography>
+                  </Box>
+                </Box>
               </Box>
-            </Paper>
+            </Box>
 
             {/* Dashboard de Rate Limits - PLUS Feature */}
-            <RateLimitDashboard />
+            <Box sx={{ mb: 4 }}>
+              <RateLimitDashboard />
+            </Box>
 
-            {/* Ejercicio 3: Prueba de Conexión */}
-            <TestConnection />
+            {/* Grid de componentes principales */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {/* Ejercicio 3: Prueba de Conexión */}
+              <TestConnection />
 
-            {/* Ejercicio 4: Lista de Calendarios */}
-            <CalendarsList 
-              onCalendarSelect={handleCalendarSelect}
-            />
+              {/* Ejercicio 4: Lista de Calendarios */}
+              <CalendarsList 
+                onCalendarSelect={handleCalendarSelect}
+              />
 
-            {/* Ejercicio 5: Crear Citas */}
-            <CreateAppointment 
-              selectedCalendar={selectedCalendar}
-              onAppointmentCreated={handleAppointmentCreated}
-            />
+              {/* Ejercicio 5: Crear Citas */}
+              <CreateAppointment 
+                selectedCalendar={selectedCalendar}
+                onAppointmentCreated={handleAppointmentCreated}
+              />
+            </Box>
 
             {/* Resumen de citas creadas */}
             {createdAppointments.length > 0 && (
