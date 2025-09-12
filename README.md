@@ -47,8 +47,8 @@ Integracion-Django---React---GHL/
 ```bash
 # El archivo .env ya está configurado con:
 GHL_BASE_URL=https://services.leadconnectorhq.com
-GHL_PRIVATE_TOKEN=pit-3ff13585-dab4-4acf-b61a-aacfcd8c29fb
-GHL_DEFAULT_LOCATION_ID=r3UrTfNuQviYjKT9vfVz
+GHL_PRIVATE_TOKEN=your_private_integration_token_here
+GHL_DEFAULT_LOCATION_ID=your_location_id_here
 GHL_MOCK=False  # Cambia a True si necesitas datos simulados
 DEBUG=True
 ```
